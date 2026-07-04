@@ -1,22 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Trophy, Users, ClipboardList, Plus, ChevronRight, Waves, Check, ArrowLeft, Loader2, X, UserMinus, UserPlus, ClipboardPaste, Share2, Copy, LogIn, LogOut, Mail, Lock, ShieldCheck, Eye, Trash2 } from "lucide-react";
-import { auth, db } from "./firebase";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  deleteDoc,
-  onSnapshot,
-  query,
-  orderBy,
-} from "firebase/firestore";
+import { Trophy, Users, ClipboardList, Plus, ChevronRight, Waves, Check, ArrowLeft, Loader2, X, UserMinus, UserPlus, ClipboardPaste, Share2, Copy } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /* Configuração dos formatos                                          */
@@ -316,58 +299,43 @@ function buildStandingsText(tournament, sorted) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Firestore helpers                                                   */
+/* Storage helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-const TOURNAMENTS_COLLECTION = "tournaments";
+async function loadIndex() {
+  try {
+    const raw = localStorage.getItem("tournament-index");
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error("loadIndex falhou:", e);
+    return [];
+  }
+}
+
+async function saveIndex(list) {
+  try {
+    localStorage.setItem("tournament-index", JSON.stringify(list));
+  } catch (e) {
+    console.error("saveIndex falhou:", e);
+  }
+}
 
 async function saveTournament(t) {
   try {
-    await setDoc(doc(db, TOURNAMENTS_COLLECTION, t.id), t);
+    localStorage.setItem(`tournament:${t.id}`, JSON.stringify(t));
   } catch (e) {
     console.error("saveTournament falhou:", e);
-    throw e;
   }
 }
 
 async function loadTournament(id) {
   try {
-    const snap = await getDoc(doc(db, TOURNAMENTS_COLLECTION, id));
-    return snap.exists() ? snap.data() : null;
+    const raw = localStorage.getItem(`tournament:${id}`);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
     console.error("loadTournament falhou:", e);
     return null;
   }
-}
-
-async function deleteTournament(id) {
-  try {
-    await deleteDoc(doc(db, TOURNAMENTS_COLLECTION, id));
-  } catch (e) {
-    console.error("deleteTournament falhou:", e);
-    throw e;
-  }
-}
-
-// Escuta em tempo real a lista de torneios (para a Home e as listas).
-// Retorna a função de "unsubscribe" (chame para parar de escutar).
-function subscribeTournamentsList(onChange) {
-  const q = query(collection(db, TOURNAMENTS_COLLECTION), orderBy("createdAt", "desc"));
-  return onSnapshot(
-    q,
-    (snap) => onChange(snap.docs.map((d) => d.data())),
-    (err) => console.error("subscribeTournamentsList falhou:", err)
-  );
-}
-
-// Escuta em tempo real um torneio específico (para telas de Jogos/Resultados).
-// Assim, se outro organizador lançar um placar, você vê a atualização na hora.
-function subscribeTournament(id, onChange) {
-  return onSnapshot(
-    doc(db, TOURNAMENTS_COLLECTION, id),
-    (snap) => onChange(snap.exists() ? snap.data() : null),
-    (err) => console.error("subscribeTournament falhou:", err)
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -455,10 +423,7 @@ const Styles = () => (
     .tp-vs-line { flex:1; border-top:1px dashed #D8CBA3; }
     .tp-vs-text { font-family:'DM Mono',monospace; font-size:11px; color:#8A7F63; }
 
-    .tp-list-item { background:#FFFFFF; border-radius:14px; padding:14px 16px; margin-bottom:10px; border:1px solid rgba(16,38,43,.1); display:flex; align-items:center; gap:10px; }
-    .tp-list-delete-btn { background:none; border:none; color:#B5443A; padding:6px; border-radius:8px; cursor:pointer; display:flex; align-items:center; flex-shrink:0; }
-    .tp-list-delete-btn:hover { background:#FDEBEB; }
-    .tp-btn-delete-link { width:100%; background:none; border:none; color:#B5443A; font-size:13.5px; font-weight:700; padding:12px; margin-top:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+    .tp-list-item { background:#FFFFFF; border-radius:14px; padding:14px 16px; margin-bottom:10px; border:1px solid rgba(16,38,43,.1); cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
     .tp-list-name { font-weight:700; font-size:15px; color:#0E4B5A; }
     .tp-list-meta { font-size:12px; color:#54666B; margin-top:2px; }
     .tp-badge { font-family:'DM Mono',monospace; font-size:11px; padding:4px 10px; border-radius:999px; font-weight:700; }
@@ -482,17 +447,6 @@ const Styles = () => (
     .tp-empty { text-align:center; padding:40px 20px; color:#54666B; }
     .tp-error-banner { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#FDEBEB; color:#9A2F2F; border-bottom:2px solid #E85D3F; padding:12px 16px; font-size:13px; }
     .tp-error-btn { background:none; border:1px solid #9A2F2F; color:#9A2F2F; border-radius:8px; padding:5px 10px; font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; }
-
-    .tp-auth-bar { display:flex; align-items:center; justify-content:space-between; background:#FFFDF6; border:1px solid #D8CBA3; border-radius:12px; padding:10px 14px; font-size:12.5px; color:#54666B; margin-bottom:18px; }
-    .tp-auth-link { background:none; border:none; color:#0E4B5A; font-weight:700; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:5px; }
-    .tp-auth-notice { display:flex; align-items:center; gap:8px; background:#FFF8E1; border:1px dashed #C9962C; color:#8A6A0E; border-radius:12px; padding:10px 14px; font-size:12.5px; margin-bottom:16px; }
-    .tp-auth-form-input { width:100%; border:2px solid #D8CBA3; background:#FFFDF6; border-radius:12px; padding:12px 14px 12px 42px; font-size:15px; color:#16262B; font-family:'Inter',sans-serif; }
-    .tp-auth-form-group { position:relative; margin-bottom:14px; }
-    .tp-auth-form-group svg { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#8A7F63; }
-    .tp-auth-toggle { display:flex; background:#EEE2C6; border-radius:12px; padding:4px; margin-bottom:20px; }
-    .tp-auth-toggle button { flex:1; border:none; background:none; padding:10px; border-radius:9px; font-weight:700; font-size:13.5px; color:#8A7F63; cursor:pointer; }
-    .tp-auth-toggle button.active { background:#0E4B5A; color:#F3E7C9; }
-    .tp-auth-error { background:#FDEBEB; color:#9A2F2F; border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:14px; }
     .tp-legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:#54666B; margin:10px 2px 18px; }
     .tp-legend strong { color:#0E4B5A; font-family:'DM Mono',monospace; margin-right:3px; }
     .tp-spin { animation: tp-spin-anim 1s linear infinite; }
@@ -513,21 +467,10 @@ export default function App() {
   const [listMode, setListMode] = useState("tracking"); // 'tracking' | 'results'
   const [generating, setGenerating] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [deleteRequest, setDeleteRequest] = useState(null); // { id, name }
-  const [deleting, setDeleting] = useState(false);
   const [exportRequest, setExportRequest] = useState(null); // { mode: 'round'|'full', roundIdx? }
   const [openError, setOpenError] = useState(null);
   const [lastOpenAttempt, setLastOpenAttempt] = useState(null);
-  const currentUnsubRef = React.useRef(null);
-
-  // --- Autenticação (qualquer conta cadastrada é organizador/admin) ---
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authScreenMode, setAuthScreenMode] = useState("login"); // 'login' | 'signup'
-  const [authForm, setAuthForm] = useState({ email: "", password: "" });
-  const [authError, setAuthError] = useState(null);
-  const [authSubmitting, setAuthSubmitting] = useState(false);
-  const isAdmin = !!user;
+  const cacheRef = React.useRef({});
 
   const [draft, setDraft] = useState({
     name: "",
@@ -540,52 +483,15 @@ export default function App() {
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState("");
 
-  // Escuta o estado de login (mantém a sessão entre recarregamentos de página).
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  // Escuta em tempo real a lista de torneios (Home, Acompanhamento, Resultados).
-  useEffect(() => {
-    const unsub = subscribeTournamentsList((list) => {
-      setIndex(list);
+    (async () => {
+      const idx = await loadIndex();
+      setIndex(idx);
       setLoading(false);
-    });
-    return () => unsub();
+    })();
   }, []);
-
-  // Abre um torneio específico e passa a escutá-lo em tempo real: se outro
-  // organizador lançar um placar em outro aparelho, a tela atualiza sozinha.
-  const openTournament = (id, mode) => {
-    setListMode(mode);
-    setOpenError(null);
-    setLastOpenAttempt({ id, mode });
-    if (currentUnsubRef.current) {
-      currentUnsubRef.current();
-      currentUnsubRef.current = null;
-    }
-    setCurrent(null);
-    currentUnsubRef.current = subscribeTournament(id, (t) => {
-      if (!t) {
-        setOpenError("Não foi possível abrir esse torneio agora.");
-        return;
-      }
-      setOpenError(null);
-      setCurrent(t);
-    });
-    setRoundIdx(0);
-    setScreen(mode === "results" ? "results" : "tracking");
-  };
 
   const goHome = () => {
-    if (currentUnsubRef.current) {
-      currentUnsubRef.current();
-      currentUnsubRef.current = null;
-    }
     setScreen("home");
     setCurrent(null);
     setNewPlayerName("");
@@ -595,10 +501,6 @@ export default function App() {
   };
 
   const startNewTournament = () => {
-    if (!isAdmin) {
-      setScreen("auth");
-      return;
-    }
     const today = new Date();
     const dstr = today.toLocaleDateString("pt-BR");
     setNewPlayerName("");
@@ -660,7 +562,7 @@ export default function App() {
     draft.playerNames.every((n) => n.trim().length > 0);
 
   const handleGenerate = async () => {
-    if (!canGenerate || !isAdmin) return;
+    if (!canGenerate) return;
     setGenerating(true);
     const cfg = TYPE_CONFIG[draft.type];
     const players = draft.playerNames.map((name, i) => ({ id: i, name: name.trim() }));
@@ -681,31 +583,42 @@ export default function App() {
       rounds,
       status: "in_progress",
       createdAt: Date.now(),
-      createdBy: user?.email || null,
     };
-    try {
-      await saveTournament(tournament);
-    } catch (e) {
-      setGenerating(false);
-      setOpenError("Não foi possível criar o torneio. Verifique sua conexão e tente novamente.");
-      return;
-    }
-    if (currentUnsubRef.current) {
-      currentUnsubRef.current();
-      currentUnsubRef.current = null;
-    }
-    currentUnsubRef.current = subscribeTournament(tournament.id, (t) => {
-      if (t) setCurrent(t);
-    });
+    await saveTournament(tournament);
+    cacheRef.current[tournament.id] = tournament;
+    const newIndex = [
+      { id: tournament.id, name: tournament.name, typeLabel: cfg.label, status: "in_progress", createdAt: tournament.createdAt },
+      ...index,
+    ];
+    setIndex(newIndex);
+    await saveIndex(newIndex);
     setCurrent(tournament);
     setRoundIdx(0);
     setGenerating(false);
     setScreen("tracking");
   };
 
+  const openTournament = async (id, mode) => {
+    setListMode(mode);
+    setOpenError(null);
+    setLastOpenAttempt({ id, mode });
+    let t = cacheRef.current[id] || null;
+    if (!t) {
+      t = await loadTournament(id);
+    }
+    if (!t) {
+      setOpenError("Não foi possível abrir esse torneio agora.");
+      return;
+    }
+    cacheRef.current[id] = t;
+    setOpenError(null);
+    setCurrent(t);
+    setRoundIdx(0);
+    setScreen(mode === "results" ? "results" : "tracking");
+  };
+
   const updateScore = useCallback(
     async (rIdx, mIdx, side, value) => {
-      if (!isAdmin) return;
       setCurrent((prev) => {
         if (!prev || prev.status === "closed") return prev;
         const clone = JSON.parse(JSON.stringify(prev));
@@ -717,14 +630,19 @@ export default function App() {
         clone.status = allDone ? "completed" : "in_progress";
 
         saveTournament(clone);
+        cacheRef.current[clone.id] = clone;
+        setIndex((idx) => {
+          const next = idx.map((e) => (e.id === clone.id ? { ...e, status: clone.status } : e));
+          saveIndex(next);
+          return next;
+        });
         return clone;
       });
     },
-    [isAdmin]
+    []
   );
 
   const closeTournament = useCallback(async () => {
-    if (!isAdmin) return;
     setCurrent((prev) => {
       if (!prev) return prev;
       const clone = JSON.parse(JSON.stringify(prev));
@@ -734,68 +652,18 @@ export default function App() {
       clone.closedAt = Date.now();
       clone.finalStandings = sorted;
       saveTournament(clone);
+      cacheRef.current[clone.id] = clone;
+      setIndex((idx) => {
+        const next = idx.map((e) => (e.id === clone.id ? { ...e, status: "closed", closedAt: clone.closedAt } : e));
+        saveIndex(next);
+        return next;
+      });
       return clone;
     });
     setShowCloseConfirm(false);
-  }, [isAdmin]);
+  }, []);
 
-  const handleAuthSubmit = async () => {
-    const email = authForm.email.trim();
-    const password = authForm.password;
-    if (!email || !password) {
-      setAuthError("Preencha e-mail e senha.");
-      return;
-    }
-    if (password.length < 6) {
-      setAuthError("A senha precisa ter pelo menos 6 caracteres.");
-      return;
-    }
-    setAuthError(null);
-    setAuthSubmitting(true);
-    try {
-      if (authScreenMode === "signup") {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-      setAuthForm({ email: "", password: "" });
-      setScreen("home");
-    } catch (e) {
-      const messages = {
-        "auth/email-already-in-use": "Esse e-mail já tem uma conta. Tente entrar em vez de cadastrar.",
-        "auth/invalid-email": "E-mail inválido.",
-        "auth/weak-password": "Senha muito fraca (mínimo 6 caracteres).",
-        "auth/user-not-found": "Não existe conta com esse e-mail.",
-        "auth/wrong-password": "Senha incorreta.",
-        "auth/invalid-credential": "E-mail ou senha incorretos.",
-        "auth/too-many-requests": "Muitas tentativas. Aguarde um pouco e tente de novo.",
-      };
-      setAuthError(messages[e.code] || "Não foi possível concluir. Tente novamente.");
-    }
-    setAuthSubmitting(false);
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    goHome();
-  };
-
-  const handleDeleteTournament = async () => {
-    if (!deleteRequest || !isAdmin) return;
-    setDeleting(true);
-    try {
-      await deleteTournament(deleteRequest.id);
-      if (current && current.id === deleteRequest.id) {
-        goHome();
-      }
-    } catch (e) {
-      setOpenError("Não foi possível excluir o torneio agora. Tente novamente.");
-    }
-    setDeleting(false);
-    setDeleteRequest(null);
-  };
-
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <div className="tp-root">
         <Styles />
@@ -833,22 +701,6 @@ export default function App() {
             onTracking={() => setScreen("list-tracking")}
             onResults={() => setScreen("list-results")}
             onOpenRecent={(id) => openTournament(id, "tracking")}
-            user={user}
-            onGoAuth={() => setScreen("auth")}
-            onLogout={handleLogout}
-          />
-        )}
-
-        {screen === "auth" && (
-          <AuthScreen
-            mode={authScreenMode}
-            setMode={setAuthScreenMode}
-            form={authForm}
-            setForm={setAuthForm}
-            error={authError}
-            submitting={authSubmitting}
-            onSubmit={handleAuthSubmit}
-            onBack={goHome}
           />
         )}
 
@@ -885,8 +737,6 @@ export default function App() {
             mode={screen === "list-tracking" ? "tracking" : "results"}
             onOpen={openTournament}
             onBack={goHome}
-            isAdmin={isAdmin}
-            onRequestDelete={(t) => setDeleteRequest({ id: t.id, name: t.name })}
           />
         )}
 
@@ -900,16 +750,7 @@ export default function App() {
             onResults={() => setScreen("results")}
             onRequestClose={() => setShowCloseConfirm(true)}
             onExport={(req) => setExportRequest(req)}
-            isAdmin={isAdmin}
-            onGoAuth={() => setScreen("auth")}
-            onRequestDelete={() => setDeleteRequest({ id: current.id, name: current.name })}
           />
-        )}
-
-        {(screen === "tracking" || screen === "results") && !current && !openError && (
-          <div className="tp-body" style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
-            <Loader2 className="tp-spin" size={26} color="#0E4B5A" />
-          </div>
         )}
 
         {screen === "results" && current && (
@@ -919,9 +760,6 @@ export default function App() {
             onTracking={() => setScreen("tracking")}
             onRequestClose={() => setShowCloseConfirm(true)}
             onExport={(req) => setExportRequest(req)}
-            isAdmin={isAdmin}
-            onGoAuth={() => setScreen("auth")}
-            onRequestDelete={() => setDeleteRequest({ id: current.id, name: current.name })}
           />
         )}
 
@@ -930,15 +768,6 @@ export default function App() {
             tournament={current}
             onCancel={() => setShowCloseConfirm(false)}
             onConfirm={closeTournament}
-          />
-        )}
-
-        {deleteRequest && (
-          <ConfirmDeleteModal
-            name={deleteRequest.name}
-            deleting={deleting}
-            onCancel={() => setDeleteRequest(null)}
-            onConfirm={handleDeleteTournament}
           />
         )}
 
@@ -964,7 +793,7 @@ function StatusBadge({ status }) {
 /* Tela: Home                                                          */
 /* ------------------------------------------------------------------ */
 
-function HomeScreen({ index, onNew, onTracking, onResults, onOpenRecent, user, onGoAuth, onLogout }) {
+function HomeScreen({ index, onNew, onTracking, onResults, onOpenRecent }) {
   return (
     <>
       <div className="tp-topbar">
@@ -973,25 +802,11 @@ function HomeScreen({ index, onNew, onTracking, onResults, onOpenRecent, user, o
         <div className="tp-sub">Super 8 · Super 10 · Super 12</div>
       </div>
       <div className="tp-body">
-        <div className="tp-auth-bar">
-          {user ? (
-            <>
-              <span><ShieldCheck size={15} style={{ verticalAlign: -2, marginRight: 5 }} />Organizador: {user.email}</span>
-              <button className="tp-auth-link" onClick={onLogout}><LogOut size={14} /> Sair</button>
-            </>
-          ) : (
-            <>
-              <span><Eye size={15} style={{ verticalAlign: -2, marginRight: 5 }} />Modo visitante</span>
-              <button className="tp-auth-link" onClick={onGoAuth}><LogIn size={14} /> Entrar como organizador</button>
-            </>
-          )}
-        </div>
-
         <button className="tp-menu-btn" onClick={onNew}>
           <div className="tp-menu-icon"><Plus size={20} /></div>
           <div>
             <div className="tp-menu-label">Novo torneio</div>
-            <div className="tp-menu-desc">{user ? "Configure regras, duplas e jogadores" : "Requer login de organizador"}</div>
+            <div className="tp-menu-desc">Configure regras, duplas e jogadores</div>
           </div>
         </button>
         <button className="tp-menu-btn" onClick={onTracking}>
@@ -1013,8 +828,8 @@ function HomeScreen({ index, onNew, onTracking, onResults, onOpenRecent, user, o
           <div style={{ marginTop: 28 }}>
             <div className="tp-label">Torneios recentes</div>
             {index.slice(0, 3).map((t) => (
-              <div key={t.id} className="tp-list-item" style={{ cursor: "pointer" }} onClick={() => onOpenRecent(t.id)}>
-                <div style={{ flex: 1 }}>
+              <div key={t.id} className="tp-list-item" onClick={() => onOpenRecent(t.id)}>
+                <div>
                   <div className="tp-list-name">{t.name}</div>
                   <div className="tp-list-meta">{t.typeLabel}</div>
                 </div>
@@ -1023,64 +838,6 @@ function HomeScreen({ index, onNew, onTracking, onResults, onOpenRecent, user, o
             ))}
           </div>
         )}
-      </div>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Tela: login / cadastro de organizador                               */
-/* ------------------------------------------------------------------ */
-
-function AuthScreen({ mode, setMode, form, setForm, error, submitting, onSubmit, onBack }) {
-  return (
-    <>
-      <div className="tp-topbar">
-        <button className="tp-back" onClick={onBack}><ArrowLeft size={16} /> Início</button>
-        <div className="tp-eyebrow">Área do organizador</div>
-        <div className="tp-title" style={{ fontSize: 26 }}>{mode === "signup" ? "Criar conta" : "Entrar"}</div>
-        <div className="tp-sub">Só é preciso login para criar torneios, lançar placares e encerrar</div>
-      </div>
-      <div className="tp-body">
-        <div className="tp-auth-toggle">
-          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Já tenho conta</button>
-          <button className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>Criar conta</button>
-        </div>
-
-        {error && <div className="tp-auth-error">{error}</div>}
-
-        <div className="tp-auth-form-group">
-          <Mail size={17} />
-          <input
-            className="tp-auth-form-input"
-            type="email"
-            placeholder="seu@email.com"
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-          />
-        </div>
-        <div className="tp-auth-form-group">
-          <Lock size={17} />
-          <input
-            className="tp-auth-form-input"
-            type="password"
-            placeholder="Senha (mínimo 6 caracteres)"
-            value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-          />
-        </div>
-
-        <button className="tp-btn tp-btn-primary" onClick={onSubmit} disabled={submitting}>
-          {submitting ? <Loader2 size={18} className="tp-spin" /> : <LogIn size={18} />}
-          {submitting ? "Aguarde..." : mode === "signup" ? "Criar conta" : "Entrar"}
-        </button>
-
-        <div className="tp-list-meta" style={{ marginTop: 16, textAlign: "center" }}>
-          {mode === "signup"
-            ? "Ao criar uma conta você já se torna organizador(a), podendo criar e gerenciar torneios."
-            : "Ainda não tem conta? Toque em \"Criar conta\" acima."}
-        </div>
       </div>
     </>
   );
@@ -1293,7 +1050,7 @@ function PlayersScreen({ draft, newPlayerName, setNewPlayerName, addPlayer, remo
 /* Tela: lista de torneios                                             */
 /* ------------------------------------------------------------------ */
 
-function ListScreen({ index, mode, onOpen, onBack, isAdmin, onRequestDelete }) {
+function ListScreen({ index, mode, onOpen, onBack }) {
   const active = index.filter((t) => t.status !== "closed");
   const closed = index.filter((t) => t.status === "closed");
 
@@ -1313,23 +1070,12 @@ function ListScreen({ index, mode, onOpen, onBack, isAdmin, onRequestDelete }) {
           <>
             <div className="tp-label">Torneios ativos</div>
             {active.map((t) => (
-              <div key={t.id} className="tp-list-item">
-                <div style={{ flex: 1, cursor: "pointer" }} onClick={() => onOpen(t.id, mode)}>
+              <div key={t.id} className="tp-list-item" onClick={() => onOpen(t.id, mode)}>
+                <div>
                   <div className="tp-list-name">{t.name}</div>
                   <div className="tp-list-meta">{t.typeLabel}</div>
                 </div>
                 <StatusBadge status={t.status} />
-                {isAdmin && (
-                  <button
-                    className="tp-list-delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRequestDelete(t);
-                    }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
               </div>
             ))}
           </>
@@ -1339,8 +1085,8 @@ function ListScreen({ index, mode, onOpen, onBack, isAdmin, onRequestDelete }) {
           <>
             <div className="tp-label" style={{ marginTop: active.length > 0 ? 20 : 0 }}>Histórico (encerrados)</div>
             {closed.map((t) => (
-              <div key={t.id} className="tp-list-item">
-                <div style={{ flex: 1, cursor: "pointer" }} onClick={() => onOpen(t.id, "results")}>
+              <div key={t.id} className="tp-list-item" onClick={() => onOpen(t.id, "results")}>
+                <div>
                   <div className="tp-list-name">{t.name}</div>
                   <div className="tp-list-meta">
                     {t.typeLabel}
@@ -1348,17 +1094,6 @@ function ListScreen({ index, mode, onOpen, onBack, isAdmin, onRequestDelete }) {
                   </div>
                 </div>
                 <StatusBadge status={t.status} />
-                {isAdmin && (
-                  <button
-                    className="tp-list-delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRequestDelete(t);
-                    }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
               </div>
             ))}
           </>
@@ -1372,11 +1107,10 @@ function ListScreen({ index, mode, onOpen, onBack, isAdmin, onRequestDelete }) {
 /* Tela: acompanhamento (lançar placares)                              */
 /* ------------------------------------------------------------------ */
 
-function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack, onResults, onRequestClose, onExport, isAdmin, onGoAuth, onRequestDelete }) {
+function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack, onResults, onRequestClose, onExport }) {
   const round = tournament.rounds[roundIdx];
   const totalRounds = tournament.rounds.length;
   const isClosed = tournament.status === "closed";
-  const scoreLocked = isClosed || !isAdmin;
 
   return (
     <>
@@ -1390,14 +1124,6 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
         {isClosed && (
           <div className="tp-resting" style={{ borderColor: "#4FA89B", background: "#E7F3EE", color: "#2F8464" }}>
             Este torneio está encerrado. Os placares ficam salvos apenas para consulta e não podem mais ser alterados.
-          </div>
-        )}
-
-        {!isClosed && !isAdmin && (
-          <div className="tp-auth-notice">
-            <Eye size={16} />
-            <span>Você está vendo como visitante.</span>
-            <button className="tp-auth-link" onClick={onGoAuth}><LogIn size={14} /> Entrar para lançar placares</button>
           </div>
         )}
 
@@ -1432,7 +1158,7 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
                 type="number"
                 min="0"
                 placeholder="?"
-                disabled={scoreLocked}
+                disabled={isClosed}
                 value={m.scoreA == null ? "" : m.scoreA}
                 onChange={(e) => updateScore(roundIdx, mIdx, "A", e.target.value)}
               />
@@ -1445,7 +1171,7 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
                 type="number"
                 min="0"
                 placeholder="?"
-                disabled={scoreLocked}
+                disabled={isClosed}
                 value={m.scoreB == null ? "" : m.scoreB}
                 onChange={(e) => updateScore(roundIdx, mIdx, "B", e.target.value)}
               />
@@ -1456,7 +1182,7 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
         <button className="tp-btn tp-btn-outline" onClick={onResults} style={{ marginTop: 8, marginBottom: 10 }}>
           <Trophy size={18} /> Ver classificação
         </button>
-        <div style={{ display: "flex", gap: 10, marginBottom: isClosed || !isAdmin ? 0 : 10 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: isClosed ? 0 : 10 }}>
           <button className="tp-btn tp-btn-ghost" style={{ flex: 1 }} onClick={() => onExport({ mode: "round", roundIdx })}>
             <Share2 size={17} /> Rodada
           </button>
@@ -1464,14 +1190,9 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
             <Share2 size={17} /> Torneio
           </button>
         </div>
-        {!isClosed && isAdmin && (
-          <button className="tp-btn tp-btn-ghost" onClick={onRequestClose} style={{ marginBottom: 10 }}>
+        {!isClosed && (
+          <button className="tp-btn tp-btn-ghost" onClick={onRequestClose}>
             <Check size={18} /> Encerrar torneio
-          </button>
-        )}
-        {isAdmin && (
-          <button className="tp-btn-delete-link" onClick={onRequestDelete}>
-            <Trash2 size={15} /> Excluir torneio
           </button>
         )}
       </div>
@@ -1483,7 +1204,7 @@ function TrackingScreen({ tournament, roundIdx, setRoundIdx, updateScore, onBack
 /* Tela: resultados / classificação                                    */
 /* ------------------------------------------------------------------ */
 
-function ResultsScreen({ tournament, onBack, onTracking, onRequestClose, onExport, isAdmin, onGoAuth, onRequestDelete }) {
+function ResultsScreen({ tournament, onBack, onTracking, onRequestClose, onExport }) {
   const isClosed = tournament.status === "closed";
   const sorted = isClosed && tournament.finalStandings
     ? tournament.finalStandings
@@ -1541,27 +1262,15 @@ function ResultsScreen({ tournament, onBack, onTracking, onRequestClose, onExpor
         <button className="tp-btn tp-btn-ghost" onClick={() => onExport({ mode: "standings" })} style={{ marginBottom: 10 }}>
           <Share2 size={18} /> Compartilhar classificação
         </button>
-        {!isClosed && isAdmin && (
+        {!isClosed && (
           <>
             <button className="tp-btn tp-btn-outline" onClick={onTracking} style={{ marginBottom: 10 }}>
               <ClipboardList size={18} /> Lançar placares
             </button>
-            <button className="tp-btn tp-btn-ghost" onClick={onRequestClose} style={{ marginBottom: 10 }}>
+            <button className="tp-btn tp-btn-ghost" onClick={onRequestClose}>
               <Check size={18} /> Encerrar torneio
             </button>
           </>
-        )}
-        {!isClosed && !isAdmin && (
-          <div className="tp-auth-notice">
-            <Eye size={16} />
-            <span>Visitante: só visualização.</span>
-            <button className="tp-auth-link" onClick={onGoAuth}><LogIn size={14} /> Entrar como organizador</button>
-          </div>
-        )}
-        {isAdmin && (
-          <button className="tp-btn-delete-link" onClick={onRequestDelete}>
-            <Trash2 size={15} /> Excluir torneio
-          </button>
         )}
       </div>
     </>
@@ -1592,29 +1301,6 @@ function ConfirmCloseModal({ tournament, onCancel, onConfirm }) {
         <div className="tp-modal-actions">
           <button className="tp-btn tp-btn-outline" onClick={onCancel} style={{ flex: 1 }}>Cancelar</button>
           <button className="tp-btn tp-btn-primary" onClick={onConfirm} style={{ flex: 1 }}>Encerrar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Modal: confirmação de exclusão                                      */
-/* ------------------------------------------------------------------ */
-
-function ConfirmDeleteModal({ name, deleting, onCancel, onConfirm }) {
-  return (
-    <div className="tp-modal-overlay" onClick={onCancel}>
-      <div className="tp-modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="tp-modal-title">Excluir "{name}"?</div>
-        <div className="tp-modal-text">
-          Essa ação apaga o torneio (jogadores, rodadas, placares e classificação) permanentemente e não pode ser desfeita. Ele deixa de aparecer para todo mundo, inclusive no histórico.
-        </div>
-        <div className="tp-modal-actions">
-          <button className="tp-btn tp-btn-outline" onClick={onCancel} style={{ flex: 1 }} disabled={deleting}>Cancelar</button>
-          <button className="tp-btn tp-btn-primary" style={{ flex: 1, background: "#B5443A" }} onClick={onConfirm} disabled={deleting}>
-            {deleting ? <Loader2 size={17} className="tp-spin" /> : <Trash2 size={17} />} {deleting ? "Excluindo..." : "Excluir"}
-          </button>
         </div>
       </div>
     </div>
